@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Jogo cooperativo para revisar testes automatizados com Jest.">
+  <title>Corrida do Jest - Dupla em Teste</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317273f'/%3E%3Cpath d='M18 33l9 9 19-22' fill='none' stroke='%2337d2c2' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --navy: #17273f;
+      --navy-2: #243b5d;
+      --ink: #203047;
+      --muted: #64758c;
+      --line: #d9e3ee;
+      --paper: #f4f7fb;
+      --white: #ffffff;
+      --mint: #27b9aa;
+      --mint-dark: #11897f;
+      --mint-soft: #e6f8f5;
+      --blue: #3478e5;
+      --blue-soft: #eaf2ff;
+      --orange: #f06a3f;
+      --orange-soft: #fff0ea;
+      --red: #d94b55;
+      --red-soft: #fdecee;
+      --green: #238c5d;
+      --green-soft: #e8f6ef;
+      --yellow: #f2b33d;
+      --shadow: 0 18px 46px rgba(23, 39, 63, .11);
+    }
+
+    * { box-sizing: border-box; }
+    html { color-scheme: light; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 6%, rgba(39,185,170,.14), transparent 25rem),
+        radial-gradient(circle at 95% 12%, rgba(240,106,63,.12), transparent 22rem),
+        var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .68; }
+    code { font-family: "Cascadia Code", Consolas, monospace; }
+    .hidden { display: none !important; }
+
+    .shell { width: min(1460px, calc(100% - 28px)); margin: 0 auto; padding: 22px 0 40px; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+      padding: 20px 24px;
+      color: var(--white);
+      border-radius: 24px;
+      background: var(--navy);
+      box-shadow: var(--shadow);
+    }
+    .topbar h1 { margin: 2px 0 0; font-size: clamp(1.55rem, 3vw, 2.25rem); letter-spacing: -.035em; }
+    .eyebrow { margin: 0; color: var(--mint); font-size: .76rem; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+
+    .primary, .secondary, .ghost {
+      min-height: 46px;
+      padding: 11px 18px;
+      border-radius: 14px;
+      border: 0;
+      font-weight: 800;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    .primary { color: var(--white); background: var(--mint-dark); box-shadow: 0 8px 0 #0a625c; }
+    .primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 0 #0a625c; }
+    .secondary { color: var(--navy); background: var(--orange-soft); border: 1px solid #ffc8b7; }
+    .ghost { color: var(--navy); background: var(--white); border: 1px solid var(--line); }
+    .topbar .ghost { color: var(--white); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22); }
+
+    .start-card, .finish-card {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: clamp(30px, 7vw, 86px);
+      align-items: center;
+      min-height: 620px;
+      padding: clamp(30px, 6vw, 82px);
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+    }
+    .start-copy h2, .finish-card h2 { margin: 12px 0 18px; font-size: clamp(2.2rem, 5vw, 4.7rem); line-height: .98; letter-spacing: -.055em; color: var(--navy); }
+    .start-copy > p { max-width: 650px; margin: 0; color: var(--muted); font-size: 1.08rem; line-height: 1.65; }
+    .cooperation-note { margin-top: 28px; padding: 18px 20px; border-left: 5px solid var(--mint); border-radius: 14px; background: var(--mint-soft); line-height: 1.5; }
+    .start-form { display: grid; gap: 10px; padding: 26px; border-radius: 22px; background: #f8fafc; border: 1px solid var(--line); }
+    .start-form label { margin-top: 5px; color: var(--navy); font-size: .88rem; font-weight: 800; }
+    .start-form label span { color: var(--muted); font-weight: 600; }
+    .start-form input { width: 100%; min-height: 48px; padding: 11px 13px; color: var(--ink); background: var(--white); border: 1px solid #bdcad8; border-radius: 12px; outline: none; }
+    .start-form input:focus { border-color: var(--mint-dark); box-shadow: 0 0 0 4px rgba(39,185,170,.14); }
+    .start-form .primary { margin-top: 12px; }
+
+    .game-grid {
+      display: grid;
+      grid-template-columns: minmax(230px, .72fr) minmax(520px, 1.65fr) minmax(240px, .76fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+    .panel { background: var(--white); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); }
+    .progress-card, .turn-card { padding: 22px; }
+    .question-card { min-height: 600px; padding: clamp(24px, 4vw, 42px); }
+    .history-card { grid-column: 1 / -1; padding: 22px; }
+
+    .team-label { color: var(--muted); font-size: .75rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .team-name { display: block; margin: 4px 0 18px; color: var(--navy); font-size: 1.35rem; }
+    .shared-chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 999px; color: var(--mint-dark); background: var(--mint-soft); font-size: .78rem; font-weight: 850; }
+    .shared-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mint); }
+
+    .position-block { margin: 24px 0; padding: 18px; border-radius: 18px; background: var(--navy); color: var(--white); }
+    .position-number { display: flex; align-items: baseline; gap: 5px; }
+    .position-number strong { font-size: 3rem; line-height: 1; }
+    .position-number span { color: #b9c8d8; font-weight: 800; }
+    .position-block p { margin: 7px 0 13px; color: #cbd7e4; font-size: .82rem; }
+    .progress-track { height: 9px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.13); }
+    .progress-track > div { width: 0; height: 100%; border-radius: inherit; background: var(--mint); transition: width .5s ease; }
+
+    .topic-flow { display: grid; gap: 7px; }
+    .topic-flow div { display: flex; align-items: center; gap: 9px; padding: 9px; border-radius: 11px; color: var(--muted); font-size: .8rem; font-weight: 750; }
+    .topic-flow span { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 8px; background: #edf2f7; font-size: .68rem; }
+    .topic-flow div.active { color: var(--navy); background: var(--orange-soft); }
+    .topic-flow div.active span { color: var(--white); background: var(--orange); }
+    .topic-flow div.done { color: var(--mint-dark); }
+    .topic-flow div.done span { color: var(--white); background: var(--mint); }
+
+    .route { margin-bottom: 28px; padding: 15px 16px; border-radius: 16px; background: #f8fafc; border: 1px solid var(--line); }
+    .route-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: var(--muted); font-size: .8rem; }
+    .route-head strong { color: var(--navy); }
+    .route-cells { display: grid; grid-template-columns: repeat(31, minmax(6px, 1fr)); gap: 3px; }
+    .route-cell { aspect-ratio: 1; min-width: 5px; border-radius: 50%; background: #dce5ee; }
+    .route-cell.passed { background: var(--mint); }
+    .route-cell.current { outline: 3px solid rgba(240,106,63,.26); background: var(--orange); transform: scale(1.35); }
+
+    .question-meta { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 22px; color: var(--muted); font-size: .86rem; font-weight: 800; }
+    .question-meta span:last-child { color: var(--mint-dark); }
+    .question-card h2 { margin: 0 0 26px; color: var(--navy); font-size: clamp(1.45rem, 3vw, 2.2rem); line-height: 1.2; white-space: pre-line; }
+    .answers { display: grid; gap: 12px; }
+    .answer { width: 100%; padding: 16px 18px; color: var(--ink); text-align: left; background: var(--white); border: 2px solid var(--line); border-radius: 15px; font-weight: 750; line-height: 1.4; }
+    .answer:hover:not(:disabled) { border-color: var(--blue); background: var(--blue-soft); transform: translateX(3px); }
+    .answer.correct { color: #146a47; border-color: var(--green); background: var(--green-soft); }
+    .answer.wrong { color: #9e2832; border-color: var(--red); background: var(--red-soft); }
+    .feedback { margin-top: 18px; padding: 16px 18px; border-radius: 14px; line-height: 1.5; font-weight: 700; }
+    .feedback.good { color: #155f43; background: var(--green-soft); border-left: 5px solid var(--green); }
+    .feedback.bad { color: #922934; background: var(--red-soft); border-left: 5px solid var(--red); }
+    .question-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+
+    .turn-banner { padding: 16px; border-radius: 16px; color: var(--white); background: linear-gradient(145deg, var(--blue), #2258b0); }
+    .turn-banner p { margin: 0 0 5px; font-size: .73rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+    .turn-banner strong { display: block; font-size: 1.35rem; line-height: 1.15; }
+    .team-pair { display: grid; gap: 8px; margin: 14px 0 22px; }
+    .player-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; color: var(--muted); background: #f4f7fa; font-size: .83rem; }
+    .player-row.active { color: var(--navy); background: var(--orange-soft); outline: 2px solid #ffc9b8; }
+    .player-row strong { color: inherit; }
+    .last-move { padding-top: 18px; border-top: 1px solid var(--line); text-align: center; }
+    .last-move > p { margin: 0 0 14px; color: var(--muted); font-size: .74rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .dice { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); place-items: center; width: 90px; height: 90px; margin: 0 auto 15px; padding: 13px; border: 3px solid var(--navy); border-radius: 21px; background: #f7fbff; box-shadow: 7px 8px 0 #c8e7dc; }
+    .dice i { display: none; width: 13px; height: 13px; border-radius: 50%; background: var(--navy); }
+    .dice i:nth-child(1) { grid-area: 1 / 1; }
+    .dice i:nth-child(5) { grid-area: 2 / 2; }
+    .dice i:nth-child(9) { grid-area: 3 / 3; }
+    .dice.face-1 i:nth-child(5),
+    .dice.face-2 i:nth-child(1), .dice.face-2 i:nth-child(9),
+    .dice.face-3 i:nth-child(1), .dice.face-3 i:nth-child(5), .dice.face-3 i:nth-child(9) { display: block; }
+    .dice.rolling { animation: shake .16s linear infinite alternate; }
+    @keyframes shake { from { transform: rotate(-4deg) scale(.98); } to { transform: rotate(4deg) scale(1.03); } }
+    #moveText { display: block; color: var(--navy); line-height: 1.35; }
+    #markText { display: block; margin-top: 8px; color: var(--orange); font-size: .82rem; font-weight: 850; line-height: 1.35; }
+
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px; }
+    .section-heading h2 { margin: 2px 0 0; color: var(--navy); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 780px; }
+    th, td { padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: .79rem; }
+    th { color: var(--muted); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; }
+    .empty-row td { color: var(--muted); text-align: center; padding: 28px; }
+    .result-good { color: var(--green); font-weight: 850; }
+    .result-bad { color: var(--red); font-weight: 850; }
+
+    .finish-card { grid-template-columns: 1fr; text-align: center; }
+    .finish-card h2 { max-width: 900px; margin-inline: auto; }
+    .finish-mark { display: grid; place-items: center; width: 82px; height: 82px; margin: 0 auto; border-radius: 24px; color: var(--white); background: var(--mint); font-size: 2.8rem; font-weight: 900; transform: rotate(-3deg); }
+    .finish-card > p:not(.eyebrow) { max-width: 750px; margin: 0 auto; color: var(--muted); font-size: 1.08rem; line-height: 1.6; }
+    .finish-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+
+    .screen-reader-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 1080px) {
+      .game-grid { grid-template-columns: 1fr 1.5fr; }
+      .turn-card { grid-column: 1; }
+      .question-card { grid-column: 2; grid-row: 1 / span 2; }
+      .history-card { grid-column: 1 / -1; }
+    }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 16px, 720px); padding-top: 8px; }
+      .topbar { align-items: flex-start; padding: 18px; }
+      .top-actions { flex-direction: column; align-items: stretch; }
+      .start-card { grid-template-columns: 1fr; min-height: 0; padding: 24px; }
+      .game-grid { grid-template-columns: 1fr; }
+      .progress-card, .turn-card, .question-card, .history-card { grid-column: 1; grid-row: auto; }
+      .question-card { min-height: 0; }
+      .route-cells { gap: 2px; }
+      .question-actions { flex-direction: column; }
+      .question-actions button { width: 100%; }
+    }
+    @media print {
+      body { background: white; }
+      .topbar, .progress-card, .turn-card, .question-card, .finish-card, .start-card { display: none !important; }
+      .history-card { display: block !important; box-shadow: none; border: 0; }
+      .shell { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">REVISÃO COOPERATIVA</p>
+        <h1>Corrida do Jest</h1>
+      </div>
+      <div class="top-actions">
+        <button id="exportBtn" class="ghost hidden" type="button">Baixar resultado</button>
+        <button id="resetBtn" class="ghost" type="button">Reiniciar</button>
+      </div>
+    </header>
+
+    <section id="startScreen" class="start-card">
+      <div class="start-copy">
+        <p>Respondam em turnos e movimentem uma única peça. Depois de cada avanço ou recuo, marquem a nova posição no tabuleiro impresso.</p>
+      </div>
+      <form id="startForm" class="start-form">
+        <label for="teamName">Nome da equipe</label>
+        <input id="teamName" name="teamName" maxlength="40" autocomplete="off" placeholder="Ex.: Dupla Debug" required>
+        <label for="player1">Nome do Jogador 1</label>
+        <input id="player1" name="player1" maxlength="32" autocomplete="off" placeholder="Jogador 1" required>
+        <label for="player2">Nome do Jogador 2</label>
+        <input id="player2" name="player2" maxlength="32" autocomplete="off" placeholder="Jogador 2" required>
+        <label for="className">Turma <span>(opcional)</span></label>
+        <input id="className" name="className" maxlength="30" autocomplete="off" placeholder="Ex.: 3º ano A">
+        <button class="primary" type="submit">Começar a revisão</button>
+      </form>
+    </section>
+
+    <section id="gameScreen" class="game-grid hidden" aria-live="polite">
+      <aside class="panel progress-card">
+        <span class="team-label">Equipe</span>
+        <strong id="teamDisplay" class="team-name"></strong>
+        <span class="shared-chip">progresso compartilhado</span>
+
+        <div class="position-block">
+          <div class="position-number"><strong id="positionValue">0</strong><span>/ 30</span></div>
+          <p>posição da equipe no tabuleiro</p>
+          <div class="progress-track"><div id="progressFill"></div></div>
+        </div>
+
+        <div class="topic-flow" aria-label="Etapas da revisão">
+          <div data-topic="0"><span>01</span>Preparação</div>
+          <div data-topic="1"><span>02</span>Função JavaScript</div>
+          <div data-topic="2"><span>03</span>Arquivo de teste</div>
+          <div data-topic="3"><span>04</span>Executando</div>
+          <div data-topic="4"><span>05</span>PASS e FAIL</div>
+          <div data-topic="5"><span>06</span>Novos usos</div>
+        </div>
+      </aside>
+
+      <section class="panel question-card">
+        <div class="route">
+          <div class="route-head"><strong>Caminho da equipe</strong><span id="routePosition">Casa 0 de 30</span></div>
+          <div id="routeCells" class="route-cells" aria-label="Progresso da casa 0 até a casa 30"></div>
+        </div>
+        <div class="question-meta">
+          <span id="roundCounter">Rodada 1</span>
+          <span id="topicName">Preparação</span>
+        </div>
+        <h2 id="questionText"></h2>
+        <div id="answers" class="answers"></div>
+        <div id="feedback" class="feedback hidden"></div>
+        <div class="question-actions">
+          <button id="rollBtn" class="primary hidden" type="button">Girar o dado</button>
+          <button id="nextBtn" class="primary hidden" type="button">Próxima rodada</button>
+        </div>
+      </section>
+
+      <aside class="panel turn-card">
+        <div class="turn-banner">
+          <p>Agora responde</p>
+          <strong id="turnName"></strong>
+        </div>
+        <div class="team-pair">
+          <div id="playerRow0" class="player-row"><span>Jogador 1</span><strong id="playerName0"></strong></div>
+          <div id="playerRow1" class="player-row"><span>Jogador 2</span><strong id="playerName1"></strong></div>
+        </div>
+        <div class="last-move">
+          <p>Movimento da rodada</p>
+          <div id="dice" class="dice face-0" aria-label="Dado ainda não lançado">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <strong id="moveText">Responda para movimentar a equipe</strong>
+          <span id="markText">Posição inicial: casa 0</span>
+        </div>
+      </aside>
+
+      <section class="panel history-card">
+        <div class="section-heading">
+          <div><p class="eyebrow">REGISTRO DA EQUIPE</p><h2>Histórico das rodadas</h2></div>
+          <span id="classDisplay" class="shared-chip"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Rodada</th><th>Jogador</th><th>Tema</th><th>Resultado</th><th>Movimento</th><th>Posição</th></tr></thead>
+            <tbody id="historyBody"><tr class="empty-row"><td colspan="6">Nenhuma rodada registrada.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="finishScreen" class="finish-card hidden">
+      <div class="finish-mark">✓</div>
+      <p class="eyebrow">REVISÃO CONCLUÍDA</p>
+      <h2>A equipe chegou à casa 30!</h2>
+      <p id="finishSummary"></p>
+      <div class="finish-actions">
+        <button id="finishExportBtn" class="primary" type="button">Baixar resultado</button>
+        <button id="finishResetBtn" class="ghost" type="button">Nova equipe</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const questionBank = [
+      { id: "E01", tier: "easy", topic: "Preparação", q: "Para que o Jest é usado em um projeto JavaScript?", a: ["Para automatizar testes", "Para desenhar a página", "Para criar o banco de dados"], correct: 0, note: "O Jest executa verificações automáticas no código JavaScript." },
+      { id: "E02", tier: "easy", topic: "Preparação", q: "Qual comando instala o Jest como ferramenta de desenvolvimento?", a: ["npm install --save-dev jest", "npm start jest", "node install test"], correct: 0, note: "A opção --save-dev registra o Jest nas dependências de desenvolvimento." },
+      { id: "E03", tier: "easy", topic: "Preparação", q: "No package.json, qual script permite executar os testes com npm test?", a: ['"test": "jest"', '"jest": "node"', '"start": "test"'], correct: 0, note: "O script test deve chamar o comando jest." },
+      { id: "E04", tier: "easy", topic: "Função JavaScript", q: "Qual é o resultado de somar(2, 3) quando a função retorna a + b?", a: ["5", "6", "23"], correct: 0, note: "A função soma os dois números e retorna 5." },
+      { id: "E05", tier: "easy", topic: "Função JavaScript", q: "O que module.exports = somar permite fazer?", a: ["Usar a função em outro arquivo", "Executar todos os testes", "Transformar número em texto"], correct: 0, note: "module.exports disponibiliza a função para ser importada pelo teste." },
+      { id: "E06", tier: "easy", topic: "Arquivo de teste", q: "Qual nome segue o padrão usado pelo Jest para o teste da função somar?", a: ["soma.test.js", "soma.txt", "test.soma.html"], correct: 0, note: "Arquivos terminados em .test.js são encontrados pelo Jest." },
+      { id: "E07", tier: "easy", topic: "Arquivo de teste", q: "O que test('descrição', () => { ... }) cria?", a: ["Um caso de teste", "Uma tabela HTML", "Uma variável global"], correct: 0, note: "test recebe uma descrição e a função que executa a verificação." },
+      { id: "E08", tier: "easy", topic: "Arquivo de teste", q: "Em expect(somar(2, 3)).toBe(5), qual parte é o valor esperado?", a: ["5", "somar", "expect"], correct: 0, note: "toBe(5) informa o resultado exato esperado." },
+      { id: "E09", tier: "easy", topic: "Arquivo de teste", q: "Como podemos ler expect(...) em linguagem simples?", a: ["Eu espero que...", "Eu instalo...", "Eu apago..."], correct: 0, note: "expect recebe o resultado real que queremos conferir." },
+      { id: "E10", tier: "easy", topic: "Executando", q: "Qual comando executa todos os testes configurados no projeto?", a: ["npm test", "npm delete", "node html"], correct: 0, note: "npm test executa o script test do package.json." },
+      { id: "E11", tier: "easy", topic: "PASS e FAIL", q: "O que PASS indica no resultado do Jest?", a: ["O resultado real correspondeu ao esperado", "O arquivo foi apagado", "O teste não foi executado"], correct: 0, note: "PASS indica que a verificação foi atendida." },
+      { id: "E12", tier: "easy", topic: "PASS e FAIL", q: "Quando o Jest mostra FAIL?", a: ["Quando a verificação não é atendida", "Sempre que usamos expect", "Quando o código tem comentários"], correct: 0, note: "FAIL aparece quando o resultado obtido não satisfaz o resultado esperado." },
+
+      { id: "M01", tier: "medium", topic: "Arquivo de teste", q: "Qual importação corresponde a module.exports = somar no arquivo soma.js?", a: ["const somar = require('./soma');", "const somar = require('./teste');", "import html from 'soma';"], correct: 0, note: "O caminho ./soma aponta para o arquivo soma.js." },
+      { id: "M02", tier: "medium", topic: "Arquivo de teste", q: "Qual teste verifica corretamente que 2 + 3 resulta em 5?", a: ["expect(somar(2, 3)).toBe(5);", "expect(5).somar(2, 3);", "toBe(somar).expect(5);"], correct: 0, note: "Executamos somar dentro de expect e comparamos o resultado com toBe." },
+      { id: "M03", tier: "medium", topic: "Executando", q: "Qual comando executa somente o arquivo soma.test.js?", a: ["npx jest soma.test.js", "npm test todos.js", "node jest --soma"], correct: 0, note: "O nome do arquivo pode ser passado ao comando npx jest." },
+      { id: "M04", tier: "medium", topic: "Executando", q: "Qual comando filtra testes pelo nome escrito em test(...)?", a: ['npx jest -t "parte do nome"', "npx jest -f arquivo", "npm nome test"], correct: 0, note: "A opção -t procura uma parte do nome do teste." },
+      { id: "M05", tier: "medium", topic: "PASS e FAIL", q: "O teste esperava 10, mas a função retornou 5. O que o Jest deve mostrar?", a: ["Expected: 10 e Received: 5", "Expected: 5 e Received: 10", "PASS"], correct: 0, note: "Expected é o que o teste pediu; Received é o resultado real." },
+      { id: "M06", tier: "medium", topic: "PASS e FAIL", q: "A função somar está correta, mas o teste usa toBe(10) para somar(2, 3). Onde está o problema?", a: ["No resultado esperado do teste", "Na soma 2 + 3", "No nome do arquivo"], correct: 0, note: "A função retorna 5; o teste foi escrito com uma expectativa incorreta." },
+      { id: "M07", tier: "medium", topic: "Novos usos", q: "A função saudacao('Ana') retorna 'Olá, Ana!'. Qual expectativa está correta?", a: ["toBe('Olá, Ana!')", "toBe(true)", "toBe(18)"], correct: 0, note: "Textos podem ser comparados exatamente com toBe." },
+      { id: "M08", tier: "medium", topic: "Novos usos", q: "maiorDeIdade(18) retorna idade >= 18. Qual valor deve ser esperado?", a: ["true", "false", "18 anos"], correct: 0, note: "A comparação 18 >= 18 é verdadeira." },
+      { id: "M09", tier: "medium", topic: "Novos usos", q: "maiorDeIdade(17) deve produzir qual resultado?", a: ["false", "true", "undefined"], correct: 0, note: "Como 17 não é maior ou igual a 18, o resultado é false." },
+      { id: "M10", tier: "medium", topic: "Novos usos", q: "A função ehPar usa numero % 2 === 0. O que ehPar(4) retorna?", a: ["true", "false", "4"], correct: 0, note: "Quatro dividido por dois deixa resto zero." },
+      { id: "M11", tier: "medium", topic: "Novos usos", q: "Qual teste verifica que 5 não é par?", a: ["expect(ehPar(5)).toBe(false);", "expect(ehPar(5)).toBe(true);", "expect(5).toBe(ehPar);"], correct: 0, note: "Cinco deixa resto diferente de zero e a função retorna false." },
+      { id: "M12", tier: "medium", topic: "Arquivo de teste", q: "O nome escrito dentro de test('...') altera o resultado da função?", a: ["Não, ele descreve o comportamento testado", "Sim, ele muda o retorno", "Sim, ele instala o Jest"], correct: 0, note: "A descrição ajuda a entender o teste, mas não muda a função." },
+      { id: "M13", tier: "medium", topic: "PASS e FAIL", q: "Se um arquivo possui três testes e somente um falha, qual resumo é coerente?", a: ["1 failed, 2 passed, 3 total", "3 passed, 1 total", "Nenhum teste executado"], correct: 0, note: "O total continua sendo três: dois passaram e um falhou." },
+      { id: "M14", tier: "medium", topic: "Executando", q: "Quando usamos npm test sem informar um arquivo, o Jest procura...", a: ["Todos os arquivos de teste reconhecidos", "Somente soma.js", "Apenas arquivos HTML"], correct: 0, note: "O Jest descobre e executa os arquivos de teste do projeto." },
+
+      { id: "A01", tier: "advanced", topic: "PASS e FAIL", q: "O teste diz '2 + 3 deve ser 5', mas executa somar(2, 5) e espera 5. Qual é o primeiro problema visível?", a: ["Descrição, entrada e expectativa não são coerentes", "Jest não testa números", "O arquivo precisa ser HTML"], correct: 0, note: "Um bom teste mantém descrição, entrada e resultado esperado coerentes." },
+      { id: "A02", tier: "advanced", topic: "PASS e FAIL", q: "A função foi alterada para return a - b, mas o teste ainda espera somar(2, 3) igual a 5. O FAIL indica...", a: ["Um erro real na implementação", "Que 2 + 3 mudou", "Que toBe não aceita números"], correct: 0, note: "O teste detectou que a implementação deixou de cumprir o comportamento esperado." },
+      { id: "A03", tier: "advanced", topic: "Novos usos", q: "saudacao('Felipe') retorna 'Olá, Felipe!'. O teste espera 'Olá Felipe'. Por que falha?", a: ["Os textos não são exatamente iguais", "Jest não aceita acentos", "Felipe é uma variável proibida"], correct: 0, note: "Vírgula e ponto de exclamação também fazem parte do texto comparado." },
+      { id: "A04", tier: "advanced", topic: "Novos usos", q: "Qual conjunto deve passar para ehPar(numero)?", a: ["ehPar(0) true e ehPar(7) false", "ehPar(0) false e ehPar(7) true", "ehPar(4) false e ehPar(5) true"], correct: 0, note: "Zero é par e sete é ímpar." },
+      { id: "A05", tier: "advanced", topic: "Novos usos", q: "O que ehPar(-2) retorna com numero % 2 === 0?", a: ["true", "false", "Erro obrigatório"], correct: 0, note: "-2 também é divisível por dois sem resto." },
+      { id: "A06", tier: "advanced", topic: "Arquivo de teste", q: "soma.js exporta somar, mas o teste usa require('./dobro'). O que deve ser corrigido?", a: ["O caminho do require", "O valor 5", "A palavra test"], correct: 0, note: "O teste precisa importar o módulo que realmente contém a função." },
+      { id: "A07", tier: "advanced", topic: "Executando", q: "Há dois testes com 'dobro' no nome. O comando npx jest -t 'dobro' tende a executar...", a: ["Os testes cujos nomes combinam com dobro", "Somente o primeiro arquivo do projeto", "Nenhum teste"], correct: 0, note: "-t filtra pelo nome do teste, podendo encontrar mais de um." },
+      { id: "A08", tier: "advanced", topic: "PASS e FAIL", q: "Expected: false e Received: true em maiorDeIdade(18). Qual expectativa provavelmente foi escrita?", a: ["toBe(false)", "toBe(true)", "toBe(18)"], correct: 0, note: "A função retorna true para 18; o teste incorretamente esperou false." },
+      { id: "A09", tier: "advanced", topic: "Arquivo de teste", q: "Qual teste de limite é mais importante para maiorDeIdade(idade >= 18)?", a: ["Testar 17 e 18", "Testar somente 50", "Testar apenas um texto vazio"], correct: 0, note: "Valores imediatamente antes e no limite ajudam a confirmar a regra." },
+      { id: "A10", tier: "advanced", topic: "PASS e FAIL", q: "Dois testes passam e um falha. Podemos dizer que o arquivo inteiro está totalmente correto?", a: ["Não, ainda existe uma verificação falhando", "Sim, a maioria venceu", "Sim, FAIL significa aviso"], correct: 0, note: "Uma suíte com qualquer teste falhando ainda precisa de investigação." },
+      { id: "A11", tier: "advanced", topic: "Função JavaScript", q: "Qual mudança faz o teste do dobro de 4 igual a 8 falhar por erro na função?", a: ["return numero + 2", "return numero * 2", "module.exports = dobro"], correct: 0, note: "Somar dois produz 6, não o dobro 8." },
+      { id: "A12", tier: "advanced", topic: "Arquivo de teste", q: "Qual sequência descreve melhor um teste simples?", a: ["Executar a função, obter o valor real e comparar com o esperado", "Escrever o resultado sem executar", "Mudar o código até aparecer PASS"], correct: 0, note: "O teste executa um comportamento e compara o resultado com uma expectativa definida." },
+      { id: "A13", tier: "advanced", topic: "PASS e FAIL", q: "Um teste falhou depois de uma alteração. Qual atitude é mais adequada?", a: ["Ler Expected e Received e investigar função e expectativa", "Apagar o teste", "Trocar FAIL por PASS no texto"], correct: 0, note: "A mensagem de falha orienta a investigação do código e do próprio teste." },
+      { id: "A14", tier: "advanced", topic: "Executando", q: "Você está corrigindo somente saudacao.test.js. Qual comando evita executar os outros arquivos?", a: ["npx jest saudacao.test.js", "npm test soma.js saudacao.js", "node --all"], correct: 0, note: "Passar o caminho do arquivo concentra a execução naquele teste." }
+    ];
+
+    const STORAGE_KEY = "corridaJestCooperativa.v1";
+    const topics = ["Preparação", "Função JavaScript", "Arquivo de teste", "Executando", "PASS e FAIL", "Novos usos"];
+    const $ = (id) => document.getElementById(id);
+    let state = freshState();
+
+    function freshState() {
+      return {
+        team: "", players: ["", ""], className: "", currentPlayer: 0,
+        position: 0, round: 1, currentQuestionId: null,
+        answerOrder: null,
+        used: { easy: [], medium: [], advanced: [] },
+        history: [], answersLog: [], phase: "question", finished: false,
+        startedAt: null
+      };
+    }
+
+    function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    function load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved && saved.team && Array.isArray(saved.players)) {
+          state = { ...freshState(), ...saved, used: { ...freshState().used, ...(saved.used || {}) } };
+        }
+      } catch (_) { localStorage.removeItem(STORAGE_KEY); }
+    }
+
+    function tierForPosition(position) {
+      if (position < 10) return "easy";
+      if (position < 20) return "medium";
+      return "advanced";
+    }
+
+    function topicIndexForPosition(position) {
+      if (position >= 26) return 5;
+      if (position >= 21) return 4;
+      if (position >= 16) return 3;
+      if (position >= 11) return 2;
+      if (position >= 6) return 1;
+      return 0;
+    }
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function chooseQuestion() {
+      const tier = tierForPosition(state.position);
+      let candidates = questionBank.filter((item) => item.tier === tier && !state.used[tier].includes(item.id));
+      if (!candidates.length) {
+        state.used[tier] = [];
+        candidates = questionBank.filter((item) => item.tier === tier);
+      }
+      const item = candidates[randomInt(0, candidates.length - 1)];
+      state.used[tier].push(item.id);
+      state.currentQuestionId = item.id;
+      state.answerOrder = shuffledIndexes(item.a.length);
+      state.phase = "question";
+      save();
+      return item;
+    }
+
+    function shuffledIndexes(length) {
+      const indexes = Array.from({ length }, (_, index) => index);
+      for (let i = indexes.length - 1; i > 0; i -= 1) {
+        const j = randomInt(0, i);
+        [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+      }
+      return indexes;
+    }
+
+    function answerOrderFor(item) {
+      const valid = Array.isArray(state.answerOrder)
+        && state.answerOrder.length === item.a.length
+        && new Set(state.answerOrder).size === item.a.length;
+      if (!valid) {
+        state.answerOrder = shuffledIndexes(item.a.length);
+        save();
+      }
+      return state.answerOrder;
+    }
+
+    function currentQuestion() {
+      return questionBank.find((item) => item.id === state.currentQuestionId) || chooseQuestion();
+    }
+
+    function renderRoute() {
+      const route = $("routeCells");
+      route.innerHTML = "";
+      for (let house = 0; house <= 30; house += 1) {
+        const cell = document.createElement("span");
+        cell.className = "route-cell";
+        if (house <= state.position) cell.classList.add("passed");
+        if (house === state.position) cell.classList.add("current");
+        cell.title = `Casa ${house}`;
+        route.appendChild(cell);
+      }
+      $("routePosition").textContent = `Casa ${state.position} de 30`;
+    }
+
+    function renderProgress() {
+      $("positionValue").textContent = state.position;
+      $("progressFill").style.width = `${(state.position / 30) * 100}%`;
+      const activeTopic = topicIndexForPosition(state.position);
+      document.querySelectorAll(".topic-flow div").forEach((node, index) => {
+        node.classList.toggle("active", index === activeTopic);
+        node.classList.toggle("done", index < activeTopic);
+      });
+      renderRoute();
+    }
+
+    function renderTurn() {
+      $("turnName").textContent = `Jogador ${state.currentPlayer + 1}: ${state.players[state.currentPlayer]}`;
+      $("playerName0").textContent = state.players[0];
+      $("playerName1").textContent = state.players[1];
+      $("playerRow0").classList.toggle("active", state.currentPlayer === 0);
+      $("playerRow1").classList.toggle("active", state.currentPlayer === 1);
+    }
+
+    function renderQuestion() {
+      const item = currentQuestion();
+      $("roundCounter").textContent = `Rodada ${state.round}`;
+      $("topicName").textContent = item.topic;
+      $("questionText").textContent = item.q;
+      $("feedback").className = "feedback hidden";
+      $("rollBtn").classList.add("hidden");
+      $("nextBtn").classList.add("hidden");
+      const answers = $("answers");
+      answers.innerHTML = "";
+      answerOrderFor(item).forEach((originalIndex) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "answer";
+        button.textContent = item.a[originalIndex];
+        button.addEventListener("click", () => answerQuestion(originalIndex, button));
+        answers.appendChild(button);
+      });
+      $("dice").className = "dice face-0";
+      $("dice").setAttribute("aria-label", "Dado ainda não lançado");
+      $("moveText").textContent = "Responda para movimentar a equipe";
+      $("markText").textContent = `Posição atual: casa ${state.position}`;
+      restoreSavedPhase(item);
+      renderTurn();
+      renderProgress();
+    }
+
+    function restoreSavedPhase(item) {
+      if (state.phase === "question") return;
+      const record = state.answersLog[state.answersLog.length - 1];
+      if (!record || record.questionId !== item.id) {
+        state.phase = "question";
+        save();
+        return;
+      }
+
+      disableAnswers();
+      const feedback = $("feedback");
+      feedback.classList.remove("hidden", "good", "bad");
+      const answerButtons = [...document.querySelectorAll(".answer")];
+
+      if (record.correct) {
+        const correctDisplayIndex = answerOrderFor(item).indexOf(item.correct);
+        answerButtons[correctDisplayIndex]?.classList.add("correct");
+        feedback.classList.add("good");
+        feedback.textContent = `Correto! ${item.note}`;
+        if (state.phase === "readyRoll") {
+          $("rollBtn").classList.remove("hidden");
+          $("moveText").textContent = "Resposta correta: dado liberado";
+          $("markText").textContent = "Gire o dado para descobrir o avanço";
+          return;
+        }
+        const movement = Number(record.positionAfter) - Number(record.positionBefore);
+        $("dice").className = `dice face-${record.roll}`;
+        $("dice").setAttribute("aria-label", `Resultado do dado: ${record.roll}`);
+        $("moveText").textContent = `Avance ${movement} ${movement === 1 ? "casa" : "casas"}`;
+      } else {
+        const selectedOriginalIndex = item.a.indexOf(record.selectedAnswer);
+        const selectedDisplayIndex = answerOrderFor(item).indexOf(selectedOriginalIndex);
+        answerButtons[selectedDisplayIndex]?.classList.add("wrong");
+        const movement = Number(record.positionBefore) - Number(record.positionAfter);
+        feedback.classList.add("bad");
+        feedback.textContent = `Resposta incorreta. ${item.note} A equipe deve voltar ${movement} ${movement === 1 ? "casa" : "casas"}.`;
+        $("moveText").textContent = movement ? `Volte ${movement} ${movement === 1 ? "casa" : "casas"}` : "Permaneça na casa 0";
+      }
+
+      $("markText").textContent = `Marque a casa ${state.position} no tabuleiro impresso`;
+      $("nextBtn").textContent = state.position >= 30 ? "Concluir partida" : "Próxima rodada";
+      $("nextBtn").classList.remove("hidden");
+    }
+
+    function disableAnswers() {
+      document.querySelectorAll(".answer").forEach((answer) => { answer.disabled = true; });
+    }
+
+    function answerQuestion(answerIndex, button) {
+      if (state.phase !== "question") return;
+      const item = currentQuestion();
+      const correct = answerIndex === item.correct;
+      disableAnswers();
+      const answerRecord = {
+        round: state.round,
+        playerNumber: state.currentPlayer + 1,
+        player: state.players[state.currentPlayer],
+        questionId: item.id,
+        topic: item.topic,
+        prompt: item.q,
+        selectedAnswer: item.a[answerIndex],
+        correctAnswer: item.a[item.correct],
+        correct,
+        positionBefore: state.position,
+        recordedAt: new Date().toLocaleString("pt-BR")
+      };
+      state.answersLog.push(answerRecord);
+      const feedback = $("feedback");
+      feedback.classList.remove("hidden", "good", "bad");
+
+      if (correct) {
+        button.classList.add("correct");
+        feedback.classList.add("good");
+        feedback.textContent = `Correto! ${item.note}`;
+        state.phase = "readyRoll";
+        $("rollBtn").classList.remove("hidden");
+        $("moveText").textContent = "Resposta correta: dado liberado";
+        $("markText").textContent = "Gire o dado para descobrir o avanço";
+        save();
+        return;
+      }
+
+      button.classList.add("wrong");
+      const oldPosition = state.position;
+      const penalty = randomInt(1, 3);
+      state.position = Math.max(0, state.position - penalty);
+      const moved = oldPosition - state.position;
+      answerRecord.penaltyDrawn = penalty;
+      answerRecord.positionAfter = state.position;
+      feedback.classList.add("bad");
+      feedback.textContent = `Resposta incorreta. ${item.note} A equipe deve voltar ${moved} ${moved === 1 ? "casa" : "casas"}.`;
+      state.history.push({
+        round: state.round, player: state.players[state.currentPlayer], topic: item.topic,
+        correct: false, movement: -moved, position: state.position
+      });
+      state.phase = "awaitNext";
+      $("moveText").textContent = moved ? `Volte ${moved} ${moved === 1 ? "casa" : "casas"}` : "Permaneça na casa 0";
+      $("markText").textContent = `Marque a casa ${state.position} no tabuleiro impresso`;
+      $("nextBtn").classList.remove("hidden");
+      renderProgress();
+      renderHistory();
+      save();
+    }
+
+    function rollDice() {
+      if (state.phase !== "readyRoll") return;
+      state.phase = "rolling";
+      const dice = $("dice");
+      const button = $("rollBtn");
+      button.disabled = true;
+      button.textContent = "Girando...";
+      dice.classList.add("rolling");
+      const animation = setInterval(() => {
+        dice.className = `dice face-${randomInt(1, 3)} rolling`;
+      }, 95);
+
+      setTimeout(() => {
+        clearInterval(animation);
+        const roll = randomInt(1, 3);
+        dice.className = `dice face-${roll}`;
+        dice.setAttribute("aria-label", `Resultado do dado: ${roll}`);
+        const oldPosition = state.position;
+        state.position = Math.min(30, state.position + roll);
+        const item = currentQuestion();
+        const answerRecord = state.answersLog[state.answersLog.length - 1];
+        answerRecord.roll = roll;
+        answerRecord.positionAfter = state.position;
+        state.history.push({
+          round: state.round, player: state.players[state.currentPlayer], topic: item.topic,
+          correct: true, movement: state.position - oldPosition, position: state.position
+        });
+        state.phase = "awaitNext";
+        $("moveText").textContent = `Avance ${roll} ${roll === 1 ? "casa" : "casas"}`;
+        $("markText").textContent = `Marque a casa ${state.position} no tabuleiro impresso`;
+        button.classList.add("hidden");
+        button.disabled = false;
+        button.textContent = "Girar o dado";
+        $("nextBtn").textContent = state.position >= 30 ? "Concluir partida" : "Próxima rodada";
+        $("nextBtn").classList.remove("hidden");
+        renderProgress();
+        renderHistory();
+        save();
+      }, 1450);
+    }
+
+    function nextRound() {
+      if (state.position >= 30) return finish();
+      state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
+      state.round += 1;
+      state.currentQuestionId = null;
+      state.answerOrder = null;
+      chooseQuestion();
+      renderQuestion();
+    }
+
+    function renderHistory() {
+      const body = $("historyBody");
+      if (!state.history.length) {
+        body.innerHTML = '<tr class="empty-row"><td colspan="6">Nenhuma rodada registrada.</td></tr>';
+        return;
+      }
+      body.innerHTML = state.history.map((item) => {
+        const movement = item.movement > 0 ? `+${item.movement}` : String(item.movement);
+        const resultClass = item.correct ? "result-good" : "result-bad";
+        return `<tr><td>${item.round}</td><td>${escapeHtml(item.player)}</td><td>${escapeHtml(item.topic)}</td><td class="${resultClass}">${item.correct ? "Acertou" : "Errou"}</td><td>${movement}</td><td>Casa ${item.position}</td></tr>`;
+      }).join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+    }
+
+    function showGame() {
+      $("startScreen").classList.add("hidden");
+      $("finishScreen").classList.add("hidden");
+      $("gameScreen").classList.remove("hidden");
+      $("exportBtn").classList.remove("hidden");
+      $("teamDisplay").textContent = state.team;
+      $("classDisplay").textContent = state.className || "Sem turma informada";
+      if (!state.currentQuestionId) chooseQuestion();
+      renderHistory();
+      renderQuestion();
+    }
+
+    function finish() {
+      state.finished = true;
+      state.position = 30;
+      save();
+      $("gameScreen").classList.add("hidden");
+      $("startScreen").classList.add("hidden");
+      $("finishScreen").classList.remove("hidden");
+      $("exportBtn").classList.add("hidden");
+      const correct = state.history.filter((item) => item.correct).length;
+      const wrong = state.history.length - correct;
+      $("finishSummary").textContent = `${state.team}, formada por ${state.players[0]} e ${state.players[1]}, concluiu a revisão em ${state.history.length} rodadas: ${correct} respostas corretas e ${wrong} incorretas.`;
+    }
+
+    function exportResult() {
+      const result = {
+        atividade: "Corrida do Jest - Dupla em Teste",
+        equipe: state.team,
+        jogadores: state.players,
+        turma: state.className || null,
+        inicio: state.startedAt,
+        exportadoEm: new Date().toISOString(),
+        posicaoFinal: state.position,
+        respostas: state.answersLog,
+        rodadas: state.history
+      };
+      const safeName = state.team.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "equipe";
+      const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `resultado-corrida-jest-${safeName}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function resetGame() {
+      if (state.team && !confirm("Deseja apagar a partida atual e começar novamente?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      state = freshState();
+      $("gameScreen").classList.add("hidden");
+      $("finishScreen").classList.add("hidden");
+      $("startScreen").classList.remove("hidden");
+      $("exportBtn").classList.add("hidden");
+      $("startForm").reset();
+      $("teamName").focus();
+    }
+
+    $("startForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      state.team = $("teamName").value.trim();
+      state.players = [$("player1").value.trim(), $("player2").value.trim()];
+      state.className = $("className").value.trim();
+      state.startedAt = new Date().toISOString();
+      chooseQuestion();
+      save();
+      showGame();
+    });
+    $("rollBtn").addEventListener("click", rollDice);
+    $("nextBtn").addEventListener("click", nextRound);
+    $("exportBtn").addEventListener("click", exportResult);
+    $("finishExportBtn").addEventListener("click", exportResult);
+    $("resetBtn").addEventListener("click", resetGame);
+    $("finishResetBtn").addEventListener("click", resetGame);
+
+    load();
+    if (state.finished) finish();
+    else if (state.team) showGame();
+  </script>
+</body>
+</html>
